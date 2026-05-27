@@ -72,11 +72,11 @@ struct ContentView: View {
     private var toolbarItems: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
-                exportToClipboard()
+                exportToFile()
             } label: {
                 Label("Export CSV", systemImage: "square.and.arrow.up")
             }
-            .help("Copy all results as CSV")
+            .help("Save results as a CSV file")
             .disabled(store.isLoading)
 
             Button {
@@ -148,6 +148,13 @@ struct ContentView: View {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(app.url.path, forType: .string)
                     }
+                    Divider()
+                    Button("Export All as CSV…") {
+                        exportToFile()
+                    }
+                    Button("Copy All as CSV") {
+                        copyCSVToClipboard()
+                    }
                 }
                 .onTapGesture(count: 2) {
                     NSWorkspace.shared.activateFileViewerSelecting([app.url])
@@ -181,7 +188,19 @@ struct ContentView: View {
 
     // MARK: Export
 
-    private func exportToClipboard() {
+    private func exportToFile() {
+        let csv = formatCSV(displayed)
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.nameFieldStringValue = "SiliconScout Export.csv"
+        panel.canCreateDirectories = true
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            try? csv.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
+    private func copyCSVToClipboard() {
         let csv = formatCSV(displayed)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(csv, forType: .string)
