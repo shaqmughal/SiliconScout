@@ -95,6 +95,58 @@ final class SiliconScoutCoreTests: XCTestCase {
         XCTAssertEqual(info.name, "Safari")
         XCTAssertEqual(info.arch, .universal)
         XCTAssertEqual(info.url,  url)
+        XCTAssertNil(info.version)
+        XCTAssertNil(info.bundleID)
+    }
+
+    func testAppInfo_withMetadata() {
+        let url  = URL(fileURLWithPath: "/Applications/Foo.app")
+        let info = AppInfo(name: "Foo", arch: .appleSilicon, url: url,
+                           version: "2.3.4", bundleID: "com.example.foo")
+        XCTAssertEqual(info.version,  "2.3.4")
+        XCTAssertEqual(info.bundleID, "com.example.foo")
+        XCTAssertEqual(info.id, "/Applications/Foo.app")
+    }
+
+    // MARK: - formatCSV
+
+    func testFormatCSV_emptyArray() {
+        let csv = formatCSV([])
+        XCTAssertEqual(csv, "Name,Architecture,Bundle ID,Version,Path")
+    }
+
+    func testFormatCSV_basic() {
+        let apps = [
+            AppInfo(name: "Alpha", arch: .appleSilicon,
+                    url: URL(fileURLWithPath: "/Applications/Alpha.app"),
+                    version: "1.0", bundleID: "com.a.alpha"),
+            AppInfo(name: "Beta",  arch: .intel,
+                    url: URL(fileURLWithPath: "/Applications/Beta.app"),
+                    version: nil,   bundleID: nil),
+        ]
+        let lines = formatCSV(apps).components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 3)
+        XCTAssertEqual(lines[0], "Name,Architecture,Bundle ID,Version,Path")
+        XCTAssertEqual(lines[1], "Alpha,Apple Silicon,com.a.alpha,1.0,/Applications/Alpha.app")
+        XCTAssertEqual(lines[2], "Beta,Intel,,,/Applications/Beta.app")
+    }
+
+    func testFormatCSV_escapesCommas() {
+        let app = AppInfo(name: "App, With Comma", arch: .universal,
+                          url: URL(fileURLWithPath: "/Applications/App.app"),
+                          version: nil, bundleID: "com.example,weird")
+        let csv = formatCSV([app])
+        let dataRow = csv.components(separatedBy: "\n")[1]
+        XCTAssertTrue(dataRow.hasPrefix("\"App, With Comma\""))
+        XCTAssertTrue(dataRow.contains("\"com.example,weird\""))
+    }
+
+    func testFormatCSV_escapesDoubleQuotes() {
+        let app = AppInfo(name: "App \"Quoted\"", arch: .unknown,
+                          url: URL(fileURLWithPath: "/Applications/App.app"))
+        let csv = formatCSV([app])
+        let dataRow = csv.components(separatedBy: "\n")[1]
+        XCTAssertTrue(dataRow.hasPrefix("\"App \"\"Quoted\"\"\""))
     }
 
     // MARK: - AppArchitecture raw values
@@ -342,5 +394,32 @@ final class SiliconScoutCoreTests: XCTestCase {
         XCTAssertTrue(results.allSatisfy { $0.url.pathExtension == "app" })
         XCTAssertEqual(results.map { $0.url.deletingPathExtension().lastPathComponent },
                        ["Alpha", "Mango", "Zebra"])
+    }
+
+    func testScanApps_populatesVersionAndBundleID() throws {
+        let dir    = tempDir.appendingPathComponent("MetaApps")
+        let name   = "MetaApp"
+        let appURL = dir.appendingPathComponent("\(name).app")
+        let macosDir = appURL.appendingPathComponent("Contents/MacOS")
+        try FileManager.default.createDirectory(at: macosDir, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: arm64BinaryURL,
+                                         to: macosDir.appendingPathComponent(name))
+        let plist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>CFBundleExecutable</key><string>\(name)</string>
+          <key>CFBundleShortVersionString</key><string>3.1.4</string>
+          <key>CFBundleIdentifier</key><string>com.test.metaapp</string>
+        </dict>
+        </plist>
+        """
+        try plist.write(to: appURL.appendingPathComponent("Contents/Info.plist"),
+                        atomically: true, encoding: .utf8)
+        let results = scanApps(in: [dir])
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].version,  "3.1.4")
+        XCTAssertEqual(results[0].bundleID, "com.test.metaapp")
     }
 }
