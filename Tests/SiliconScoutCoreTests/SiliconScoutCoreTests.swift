@@ -87,6 +87,16 @@ final class SiliconScoutCoreTests: XCTestCase {
         }
     }
 
+    // MARK: - AppInfo
+
+    func testAppInfo_storesAllFields() {
+        let url  = URL(fileURLWithPath: "/Applications/Safari.app")
+        let info = AppInfo(name: "Safari", arch: .universal, url: url)
+        XCTAssertEqual(info.name, "Safari")
+        XCTAssertEqual(info.arch, .universal)
+        XCTAssertEqual(info.url,  url)
+    }
+
     // MARK: - AppArchitecture raw values
 
     func testAppArchitecture_rawValues() {
@@ -328,5 +338,9 @@ final class SiliconScoutCoreTests: XCTestCase {
         let results = scanApps(in: [dir])
         XCTAssertEqual(results.map(\.name), ["Alpha", "Mango", "Zebra"])
         XCTAssertTrue(results.allSatisfy { $0.arch == .appleSilicon })
+        // Each AppInfo URL should point to its .app bundle.
+        XCTAssertTrue(results.allSatisfy { $0.url.pathExtension == "app" })
+        XCTAssertEqual(results.map { $0.url.deletingPathExtension().lastPathComponent },
+                       ["Alpha", "Mango", "Zebra"])
     }
 }
