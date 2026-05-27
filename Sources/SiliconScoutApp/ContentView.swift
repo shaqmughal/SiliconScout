@@ -2,6 +2,13 @@ import SwiftUI
 import Foundation
 import SiliconScoutCore
 
+// MARK: - Brand
+
+private extension Color {
+    // Vibrant indigo — readable on both light and dark backgrounds
+    static let brand = Color(red: 0.35, green: 0.45, blue: 0.95)
+}
+
 // MARK: - ViewModel
 
 final class AppStore: ObservableObject {
@@ -115,6 +122,7 @@ struct ContentView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
+        .background(Color.brand.opacity(0.06))
     }
 
     // MARK: Loading
@@ -122,6 +130,7 @@ struct ContentView: View {
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView().scaleEffect(1.2)
+                .tint(.brand)
             Text("Scanning apps…").foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -130,7 +139,7 @@ struct ContentView: View {
     // MARK: App list
 
     private var appList: some View {
-        List(displayed, id: \.name) { app in
+        List(displayed) { app in
             AppRow(app: app)
                 .contextMenu {
                     Button("Show in Finder") {
@@ -165,6 +174,10 @@ struct ContentView: View {
         }
     }
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
     // MARK: Status bar
 
     private var statusBar: some View {
@@ -177,10 +190,16 @@ struct ContentView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             Spacer()
+            Text("v\(appVersion)")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.bar)
+        .overlay(alignment: .top) {
+            Color.brand.opacity(0.3).frame(height: 1)
+        }
     }
 
     // MARK: Export
@@ -196,8 +215,6 @@ struct ContentView: View {
             try? csv.write(to: url, atomically: true, encoding: .utf8)
         }
     }
-
-
 }
 
 // MARK: - Get Info Sheet
@@ -212,25 +229,28 @@ struct GetInfoSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 12) {
-                AppIconView(url: app.url)
-                    .frame(width: 48, height: 48)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(app.name)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    ArchBadge(arch: app.arch)
+            // Header with brand gradient bar
+            ZStack(alignment: .bottom) {
+                Color.brand.opacity(0.08)
+                HStack(spacing: 12) {
+                    AppIconView(url: app.url)
+                        .frame(width: 48, height: 48)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(app.name)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                        ArchBadge(arch: app.arch)
+                    }
+                    Spacer()
+                    Button("Done") { dismiss() }
+                        .keyboardShortcut(.defaultAction)
                 }
-                Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.defaultAction)
+                .padding()
             }
-            .padding()
+            .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
-            // Fields
             Form {
                 infoRow(label: "Kind",       value: kind)
                 if let v = app.version   { infoRow(label: "Version",   value: v) }
@@ -356,8 +376,8 @@ struct ArchBadge: View {
 
     private var archColor: Color {
         switch arch {
-        case .appleSilicon: return .green
-        case .universal:    return .blue
+        case .appleSilicon: return .brand
+        case .universal:    return .green
         case .intel:        return .orange
         case .unknown:      return .gray
         }
@@ -377,8 +397,10 @@ struct FilterChip: View {
                 .font(.subheadline)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(isSelected ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
-                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                .background(isSelected
+                    ? Color.brand.opacity(0.15)
+                    : Color.secondary.opacity(0.10))
+                .foregroundStyle(isSelected ? Color.brand : Color.primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)

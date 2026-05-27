@@ -20,7 +20,8 @@ let package = Package(
         .executableTarget(
             name: "SiliconScoutApp",
             dependencies: ["SiliconScoutCore"],
-            path: "Sources/SiliconScoutApp"
+            path: "Sources/SiliconScoutApp",
+            resources: [.process("Assets.xcassets")]
         ),
         .testTarget(
             name: "SiliconScoutCoreTests",
