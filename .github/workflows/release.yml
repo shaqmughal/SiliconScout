@@ -22,19 +22,35 @@ jobs:
 
       - name: Package .app bundle
         run: |
+          set -euo pipefail
+
           VERSION="${GITHUB_REF_NAME#v}"
 
+          rm -rf SiliconScout.app "SiliconScout-$VERSION.zip"
           mkdir -p SiliconScout.app/Contents/MacOS
           mkdir -p SiliconScout.app/Contents/Resources
 
           APP_BIN="$(find .build -type f -path '*/release/SiliconScoutApp' | head -n 1)"
-          test -n "$APP_BIN"
+          if [ -z "$APP_BIN" ]; then
+            echo "Could not find built SiliconScoutApp binary"
+            exit 1
+          fi
+
+          if [ ! -f packaging/Info.plist ]; then
+            echo "Missing packaging/Info.plist"
+            exit 1
+          fi
+
           cp "$APP_BIN" SiliconScout.app/Contents/MacOS/SiliconScout
           chmod +x SiliconScout.app/Contents/MacOS/SiliconScout
+
           sed "s/{{VERSION}}/$VERSION/g" packaging/Info.plist \
             > SiliconScout.app/Contents/Info.plist
 
-          zip -r "SiliconScout-$VERSION.zip" SiliconScout.app
+          test -f SiliconScout.app/Contents/Info.plist
+          test -f SiliconScout.app/Contents/MacOS/SiliconScout
+
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent SiliconScout.app "SiliconScout-$VERSION.zip"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
