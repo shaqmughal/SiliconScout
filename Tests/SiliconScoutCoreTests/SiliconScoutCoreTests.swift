@@ -139,6 +139,12 @@ final class SiliconScoutCoreTests: XCTestCase {
                        .unknown)
     }
 
+    func testArchitectureViaLipo_launchFailure() {
+        // A bad lipo path makes process.run() throw → covers the catch branch.
+        XCTAssertEqual(architectureViaLipo(executable: arm64BinaryURL,
+                                           lipoPath: "/nonexistent/lipo"), .unknown)
+    }
+
     // MARK: - resolveLauncherTarget
 
     func testResolveLauncherTarget_nonScriptFile() {

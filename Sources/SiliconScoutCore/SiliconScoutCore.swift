@@ -61,10 +61,13 @@ public func architecture(
 }
 
 /// Ask `lipo -archs` for the CPU slices in an executable.
-/// Returns `.unknown` if the file is not a Mach-O (e.g. a shell script).
-public func architectureViaLipo(executable: URL) -> AppArchitecture {
+/// Returns `.unknown` if the file is not a Mach-O (e.g. a shell script) or if
+/// lipo can't be launched.
+///
+/// - Parameter lipoPath: Injectable for testing; defaults to `/usr/bin/lipo`.
+public func architectureViaLipo(executable: URL, lipoPath: String = "/usr/bin/lipo") -> AppArchitecture {
     let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/lipo")
+    process.executableURL = URL(fileURLWithPath: lipoPath)
     process.arguments = ["-archs", executable.path]
     let stdout = Pipe()
     process.standardOutput = stdout
