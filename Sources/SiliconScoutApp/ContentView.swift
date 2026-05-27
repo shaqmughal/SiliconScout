@@ -174,6 +174,10 @@ struct ContentView: View {
         }
     }
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
     // MARK: Status bar
 
     private var statusBar: some View {
@@ -186,6 +190,9 @@ struct ContentView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             Spacer()
+            Text("v\(appVersion)")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
