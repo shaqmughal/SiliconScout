@@ -62,6 +62,7 @@ struct ContentView: View {
                     statusBar
                 }
             }
+            .navigationTitle("SiliconScout")
             .searchable(text: $searchText, placement: .toolbar, prompt: "Search apps")
             .toolbar { toolbarItems }
         }
@@ -76,19 +77,6 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
-        // Branded title: icon + name in the center of the toolbar
-        ToolbarItem(placement: .principal) {
-            HStack(spacing: 7) {
-                Image("AppLogo")
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 24, height: 24)
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                Text("SiliconScout")
-                    .font(.headline)
-            }
-        }
-
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 exportToFile()
