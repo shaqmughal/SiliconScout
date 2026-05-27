@@ -8,15 +8,51 @@ public enum AppArchitecture: String, Equatable {
     case unknown      = "Unknown"
 }
 
-public struct AppInfo {
+public struct AppInfo: Identifiable {
+    public var id: String { url.path }
     public let name: String
     public let arch: AppArchitecture
     public let url: URL
-    public init(name: String, arch: AppArchitecture, url: URL) {
-        self.name = name
-        self.arch = arch
-        self.url  = url
+    public let version: String?
+    public let bundleID: String?
+
+    public init(
+        name: String,
+        arch: AppArchitecture,
+        url: URL,
+        version: String? = nil,
+        bundleID: String? = nil
+    ) {
+        self.name     = name
+        self.arch     = arch
+        self.url      = url
+        self.version  = version
+        self.bundleID = bundleID
     }
+}
+
+/// Build a CSV string from an array of AppInfo.
+/// Fields: Name, Architecture, Bundle ID, Version, Path
+/// Values containing commas or double-quotes are quoted and internal quotes doubled.
+public func formatCSV(_ apps: [AppInfo]) -> String {
+    let header = "Name,Architecture,Bundle ID,Version,Path"
+    let rows = apps.map { app in
+        [
+            csvEscape(app.name),
+            csvEscape(app.arch.rawValue),
+            csvEscape(app.bundleID ?? ""),
+            csvEscape(app.version ?? ""),
+            csvEscape(app.url.path),
+        ].joined(separator: ",")
+    }
+    return ([header] + rows).joined(separator: "\n")
+}
+
+private func csvEscape(_ value: String) -> String {
+    guard value.contains(",") || value.contains("\"") || value.contains("\n") else {
+        return value
+    }
+    return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
 }
 
 /// Map the presence of CPU slices to a classification.
@@ -128,7 +164,16 @@ public func scanApps(in directories: [URL]) -> [AppInfo] {
         ) else { continue }
         for entry in entries where entry.pathExtension == "app" {
             let name = entry.deletingPathExtension().lastPathComponent
-            apps.append(AppInfo(name: name, arch: architecture(of: entry), url: entry))
+            let bundle = Bundle(url: entry)
+            let version  = bundle?.infoDictionary?["CFBundleShortVersionString"] as? String
+            let bundleID = bundle?.bundleIdentifier
+            apps.append(AppInfo(
+                name: name,
+                arch: architecture(of: entry),
+                url: entry,
+                version: version,
+                bundleID: bundleID
+            ))
         }
     }
     return apps.sorted {
