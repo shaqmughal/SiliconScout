@@ -333,10 +333,7 @@ struct AppIconView: View {
         }
         .frame(width: 32, height: 32)
         .task {
-            let path = url.path
-            icon = await Task.detached(priority: .utility) {
-                NSWorkspace.shared.icon(forFile: path)
-            }.value
+            icon = NSWorkspace.shared.icon(forFile: url.path)
         }
     }
 }

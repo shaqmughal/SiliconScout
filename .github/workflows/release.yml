@@ -27,7 +27,10 @@ jobs:
           mkdir -p SiliconScout.app/Contents/MacOS
           mkdir -p SiliconScout.app/Contents/Resources
 
-          cp .build/release/SiliconScoutApp SiliconScout.app/Contents/MacOS/SiliconScout
+          APP_BIN="$(find .build -type f -path '*/release/SiliconScoutApp' | head -n 1)"
+          test -n "$APP_BIN"
+          cp "$APP_BIN" SiliconScout.app/Contents/MacOS/SiliconScout
+          chmod +x SiliconScout.app/Contents/MacOS/SiliconScout
           sed "s/{{VERSION}}/$VERSION/g" packaging/Info.plist \
             > SiliconScout.app/Contents/Info.plist
 
