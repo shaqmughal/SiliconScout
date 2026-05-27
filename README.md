@@ -2,7 +2,7 @@
 
 A macOS utility that scans your installed applications and reports whether each one is **Apple Silicon** (arm64), **Intel** (x86_64, runs via Rosetta 2), or **Universal** (both).
 
-![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange) ![License: MIT](https://img.shields.io/badge/License-MIT-green) [![CI](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml/badge.svg)](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-native-green) ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange) ![License: MIT](https://img.shields.io/badge/License-MIT-green) [![CI](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml/badge.svg)](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml)
 
 ## Download
 
