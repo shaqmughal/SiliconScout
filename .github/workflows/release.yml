@@ -30,9 +30,10 @@ jobs:
           mkdir -p SiliconScout.app/Contents/MacOS
           mkdir -p SiliconScout.app/Contents/Resources
 
-          APP_BIN="$(find .build -type f -path '*/release/SiliconScoutApp' | head -n 1)"
+          APP_BIN="$(find .build -type f -name 'SiliconScoutApp' -perm -111 | head -n 1)"
           if [ -z "$APP_BIN" ]; then
             echo "Could not find built SiliconScoutApp binary"
+            find .build -type f | sort
             exit 1
           fi
 
