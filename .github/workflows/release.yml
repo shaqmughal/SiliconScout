@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build universal binary
+        run: |
+          swift build -c release --target SiliconScoutApp --arch arm64
+          swift build -c release --target SiliconScoutApp --arch x86_64
+          lipo -create -output SiliconScout \
+            .build/arm64-apple-macosx/release/SiliconScoutApp \
+            .build/x86_64-apple-macosx/release/SiliconScoutApp
+
+      - name: Package .app bundle
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          mkdir -p SiliconScout.app/Contents/MacOS
+          mkdir -p SiliconScout.app/Contents/Resources
+
+          cp SiliconScout SiliconScout.app/Contents/MacOS/SiliconScout
+          sed "s/{{VERSION}}/$VERSION/g" packaging/Info.plist \
+            > SiliconScout.app/Contents/Info.plist
+
+          zip -r "SiliconScout-$VERSION.zip" SiliconScout.app
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SiliconScout-*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
