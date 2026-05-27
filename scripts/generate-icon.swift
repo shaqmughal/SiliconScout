@@ -11,22 +11,22 @@ func color(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColo
 }
 
 func drawIcon(ctx: CGContext, s: CGFloat) {
-    // ── Background gradient (indigo → purple) ──────────────────────────────
-    let gradient = CGGradient(
-        colorsSpace: CGColorSpaceCreateDeviceRGB(),
-        colors: [color(0.14, 0.22, 0.62), color(0.38, 0.14, 0.60)] as CFArray,
-        locations: [0, 1]
-    )!
-    ctx.drawLinearGradient(gradient,
-        start: CGPoint(x: 0, y: s), end: CGPoint(x: s, y: 0), options: [])
+    // ── White background ───────────────────────────────────────────────────
+    ctx.setFillColor(color(1, 1, 1, 1))
+    ctx.fill(CGRect(x: 0, y: 0, width: s, height: s))
+
+    // Brand colors: indigo for chip, purple for magnifying glass
+    let indigo  = color(0.14, 0.22, 0.62)
+    let purple  = color(0.38, 0.14, 0.60)
+    let gridCol = color(0.14, 0.22, 0.62, 0.22)
 
     // ── Chip body ───────────────────────────────────────────────────────────
     let inset  = s * 0.22
     let chip   = CGRect(x: inset, y: inset, width: s - inset * 2, height: s - inset * 2)
     let cRad   = chip.width * 0.16
-    let stroke = s * 0.028
+    let stroke = s * 0.030
 
-    ctx.setStrokeColor(color(1, 1, 1, 0.95))
+    ctx.setStrokeColor(indigo)
     ctx.setLineWidth(stroke)
     let chipPath = CGMutablePath()
     chipPath.addRoundedRect(in: chip, cornerWidth: cRad, cornerHeight: cRad)
@@ -34,7 +34,7 @@ func drawIcon(ctx: CGContext, s: CGFloat) {
     ctx.strokePath()
 
     // Inner grid (subtle)
-    ctx.setStrokeColor(color(1, 1, 1, 0.28))
+    ctx.setStrokeColor(gridCol)
     ctx.setLineWidth(s * 0.016)
     ctx.move(to: CGPoint(x: s * 0.5, y: chip.minY + stroke))
     ctx.addLine(to: CGPoint(x: s * 0.5, y: chip.maxY - stroke))
@@ -44,7 +44,7 @@ func drawIcon(ctx: CGContext, s: CGFloat) {
     ctx.strokePath()
 
     // ── Pins (3 per side) ──────────────────────────────────────────────────
-    ctx.setFillColor(color(1, 1, 1, 0.90))
+    ctx.setFillColor(indigo)
     let pinLen = s * 0.082
     let pinW   = s * 0.030
     let n      = 3
@@ -82,7 +82,7 @@ func drawIcon(ctx: CGContext, s: CGFloat) {
     let hLen   = s * 0.110
     let angle  = -CGFloat.pi / 4
 
-    ctx.setStrokeColor(color(1, 1, 1, 0.95))
+    ctx.setStrokeColor(purple)
     ctx.setLineWidth(mgW)
     ctx.setLineCap(.round)
     ctx.addEllipse(in: CGRect(x: mgCX - mgR, y: mgCY - mgR, width: mgR * 2, height: mgR * 2))

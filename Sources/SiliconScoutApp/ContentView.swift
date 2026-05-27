@@ -5,9 +5,9 @@ import SiliconScoutCore
 // MARK: - Brand
 
 private extension Color {
-    static let brandIndigo = Color(red: 0.14, green: 0.22, blue: 0.62)
-    static let brandPurple = Color(red: 0.38, green: 0.14, blue: 0.60)
-    static let brandMid    = Color(red: 0.26, green: 0.18, blue: 0.61)
+    static let brandIndigo = Color(red: 0.14, green: 0.22, blue: 0.62)  // chip color
+    static let brandPurple = Color(red: 0.38, green: 0.14, blue: 0.60)  // magnifier color
+    static let brandMid    = Color(red: 0.26, green: 0.18, blue: 0.61)  // midpoint
 }
 
 private struct BrandGradient: View {
