@@ -11,9 +11,11 @@ public enum AppArchitecture: String, Equatable {
 public struct AppInfo {
     public let name: String
     public let arch: AppArchitecture
-    public init(name: String, arch: AppArchitecture) {
+    public let url: URL
+    public init(name: String, arch: AppArchitecture, url: URL) {
         self.name = name
         self.arch = arch
+        self.url  = url
     }
 }
 
@@ -126,7 +128,7 @@ public func scanApps(in directories: [URL]) -> [AppInfo] {
         ) else { continue }
         for entry in entries where entry.pathExtension == "app" {
             let name = entry.deletingPathExtension().lastPathComponent
-            apps.append(AppInfo(name: name, arch: architecture(of: entry)))
+            apps.append(AppInfo(name: name, arch: architecture(of: entry), url: entry))
         }
     }
     return apps.sorted {
