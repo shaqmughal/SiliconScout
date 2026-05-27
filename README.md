@@ -22,7 +22,11 @@ SiliconScout helps you find which apps on your Mac are still Intel-only so you c
 
 Unzip and drag `SiliconScout.app` to your Applications folder.
 
-> **First launch:** macOS will block the app because it is not notarized. Right-click (or Control-click) the app and choose **Open**, then click **Open** in the dialog. You only need to do this once.
+> **First launch:** macOS will block the app because it is not notarized. Open **Terminal** and run:
+> ```sh
+> xattr -cr ~/Downloads/SiliconScout.app
+> ```
+> Then double-click the app as normal. You only need to do this once. If you moved the app to `/Applications` first, adjust the path accordingly.
 
 ## Features
 
