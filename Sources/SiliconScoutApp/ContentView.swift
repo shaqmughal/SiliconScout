@@ -139,7 +139,7 @@ struct ContentView: View {
     // MARK: App list
 
     private var appList: some View {
-        List(displayed, id: \.name) { app in
+        List(displayed) { app in
             AppRow(app: app)
                 .contextMenu {
                     Button("Show in Finder") {

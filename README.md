@@ -1,8 +1,20 @@
+<p align="center">
+  <img src="Sources/SiliconScoutApp/Assets.xcassets/AppIcon.appiconset/AppIcon-256.png" width="128" alt="SiliconScout icon" />
+</p>
+
 # SiliconScout
 
 A macOS utility that scans your installed applications and reports whether each one is **Apple Silicon** (arm64), **Intel** (x86_64, runs via Rosetta 2), or **Universal** (both).
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-native-green) ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange) ![License: MIT](https://img.shields.io/badge/License-MIT-green) [![CI](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml/badge.svg)](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml)
+
+## Why this matters
+
+Apple has confirmed that **Rosetta 2 will be removed starting with macOS 28** — only a small set of older, unmaintained games will retain any Rosetta functionality after that point. Apple recommends that users *"update your Intel-based apps, plug-ins, extensions, and other add-ons for Apple silicon"* for *"optimal performance and future compatibility."*
+
+SiliconScout helps you find which apps on your Mac are still Intel-only so you can update or replace them before support ends.
+
+> **Source:** [Apple Support — About Rosetta and Rosetta 2](https://support.apple.com/en-us/102527)
 
 ## Download
 
