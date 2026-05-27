@@ -152,9 +152,6 @@ struct ContentView: View {
                     Button("Export All as CSV…") {
                         exportToFile()
                     }
-                    Button("Copy All as CSV") {
-                        copyCSVToClipboard()
-                    }
                 }
                 .onTapGesture(count: 2) {
                     NSWorkspace.shared.activateFileViewerSelecting([app.url])
@@ -200,11 +197,7 @@ struct ContentView: View {
         }
     }
 
-    private func copyCSVToClipboard() {
-        let csv = formatCSV(displayed)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(csv, forType: .string)
-    }
+
 }
 
 // MARK: - Get Info Sheet
