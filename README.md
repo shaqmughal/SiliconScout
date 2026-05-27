@@ -2,7 +2,15 @@
 
 A macOS utility that scans your installed applications and reports whether each one is **Apple Silicon** (arm64), **Intel** (x86_64, runs via Rosetta 2), or **Universal** (both).
 
-![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange) ![License: MIT](https://img.shields.io/badge/License-MIT-green)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange) ![License: MIT](https://img.shields.io/badge/License-MIT-green) [![CI](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml/badge.svg)](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml)
+
+## Download
+
+**[Download the latest release](https://github.com/shaqmughal/SiliconScout/releases/latest)**
+
+Unzip and drag `SiliconScout.app` to your Applications folder.
+
+> **First launch:** macOS will block the app because it is not notarized. Right-click (or Control-click) the app and choose **Open**, then click **Open** in the dialog. You only need to do this once.
 
 ## Features
 
@@ -23,23 +31,17 @@ A macOS utility that scans your installed applications and reports whether each 
 
 For every `.app` bundle, SiliconScout reads the Mach-O CPU slices via Foundation's `Bundle.executableArchitectures`. For apps that use a shell-script launcher (common in JetBrains and .NET tools), it parses the script, resolves the real binary, and inspects it via `lipo`.
 
-## Requirements
+## Build from source
 
-- macOS 13 Ventura or later
-- Xcode 15 / Swift 5.9
-
-## Running
-
-### SwiftUI app
+Requires Xcode 15 and macOS 13 or later.
 
 ```sh
-swift build --target SiliconScoutApp
-open .build/debug/SiliconScoutApp.app
+git clone https://github.com/shaqmughal/SiliconScout.git
+cd SiliconScout
+xed .
 ```
 
-Or open the package in Xcode (`xed .`) and run the `SiliconScoutApp` target.
-
-### Command-line
+Select the `SiliconScoutApp` scheme and press Run. A command-line version is also available:
 
 ```sh
 swift run siliconscout
