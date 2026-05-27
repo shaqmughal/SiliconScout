@@ -2,6 +2,24 @@ import SwiftUI
 import Foundation
 import SiliconScoutCore
 
+// MARK: - Brand
+
+private extension Color {
+    static let brandIndigo = Color(red: 0.14, green: 0.22, blue: 0.62)
+    static let brandPurple = Color(red: 0.38, green: 0.14, blue: 0.60)
+    static let brandMid    = Color(red: 0.26, green: 0.18, blue: 0.61)
+}
+
+private struct BrandGradient: View {
+    var opacity: Double = 1
+    var body: some View {
+        LinearGradient(
+            colors: [.brandIndigo.opacity(opacity), .brandPurple.opacity(opacity)],
+            startPoint: .topLeading, endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - ViewModel
 
 final class AppStore: ObservableObject {
@@ -55,7 +73,6 @@ struct ContentView: View {
                     statusBar
                 }
             }
-            .navigationTitle("SiliconScout")
             .searchable(text: $searchText, placement: .toolbar, prompt: "Search apps")
             .toolbar { toolbarItems }
         }
@@ -70,6 +87,25 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
+        // Branded title: icon + name in the center of the toolbar
+        ToolbarItem(placement: .principal) {
+            HStack(spacing: 7) {
+                Image("AppLogo")
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 24, height: 24)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                Text("SiliconScout")
+                    .font(.headline)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.brandIndigo, .brandPurple],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                    )
+            }
+        }
+
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 exportToFile()
@@ -115,6 +151,7 @@ struct ContentView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
+        .background(BrandGradient(opacity: 0.07))
     }
 
     // MARK: Loading
@@ -122,6 +159,7 @@ struct ContentView: View {
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView().scaleEffect(1.2)
+                .tint(.brandMid)
             Text("Scanning apps…").foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -181,6 +219,9 @@ struct ContentView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.bar)
+        .overlay(alignment: .top) {
+            BrandGradient(opacity: 0.25).frame(height: 1)
+        }
     }
 
     // MARK: Export
@@ -196,8 +237,6 @@ struct ContentView: View {
             try? csv.write(to: url, atomically: true, encoding: .utf8)
         }
     }
-
-
 }
 
 // MARK: - Get Info Sheet
@@ -212,25 +251,28 @@ struct GetInfoSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 12) {
-                AppIconView(url: app.url)
-                    .frame(width: 48, height: 48)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(app.name)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    ArchBadge(arch: app.arch)
+            // Header with brand gradient bar
+            ZStack(alignment: .bottom) {
+                BrandGradient(opacity: 0.12)
+                HStack(spacing: 12) {
+                    AppIconView(url: app.url)
+                        .frame(width: 48, height: 48)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(app.name)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                        ArchBadge(arch: app.arch)
+                    }
+                    Spacer()
+                    Button("Done") { dismiss() }
+                        .keyboardShortcut(.defaultAction)
                 }
-                Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.defaultAction)
+                .padding()
             }
-            .padding()
+            .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
-            // Fields
             Form {
                 infoRow(label: "Kind",       value: kind)
                 if let v = app.version   { infoRow(label: "Version",   value: v) }
@@ -356,8 +398,8 @@ struct ArchBadge: View {
 
     private var archColor: Color {
         switch arch {
-        case .appleSilicon: return .green
-        case .universal:    return .blue
+        case .appleSilicon: return .brandMid
+        case .universal:    return Color(red: 0.20, green: 0.50, blue: 0.90)
         case .intel:        return .orange
         case .unknown:      return .gray
         }
@@ -377,8 +419,10 @@ struct FilterChip: View {
                 .font(.subheadline)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(isSelected ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
-                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                .background(isSelected
+                    ? Color.brandMid.opacity(0.18)
+                    : Color.secondary.opacity(0.10))
+                .foregroundStyle(isSelected ? Color.brandMid : Color.primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
