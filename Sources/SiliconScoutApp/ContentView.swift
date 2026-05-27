@@ -5,19 +5,8 @@ import SiliconScoutCore
 // MARK: - Brand
 
 private extension Color {
-    static let brandIndigo = Color(red: 0.14, green: 0.22, blue: 0.62)  // chip color
-    static let brandPurple = Color(red: 0.38, green: 0.14, blue: 0.60)  // magnifier color
-    static let brandMid    = Color(red: 0.26, green: 0.18, blue: 0.61)  // midpoint
-}
-
-private struct BrandGradient: View {
-    var opacity: Double = 1
-    var body: some View {
-        LinearGradient(
-            colors: [.brandIndigo.opacity(opacity), .brandPurple.opacity(opacity)],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
-    }
+    // Vibrant indigo — readable on both light and dark backgrounds
+    static let brand = Color(red: 0.35, green: 0.45, blue: 0.95)
 }
 
 // MARK: - ViewModel
@@ -97,12 +86,6 @@ struct ContentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 5))
                 Text("SiliconScout")
                     .font(.headline)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.brandIndigo, .brandPurple],
-                            startPoint: .leading, endPoint: .trailing
-                        )
-                    )
             }
         }
 
@@ -151,7 +134,7 @@ struct ContentView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
-        .background(BrandGradient(opacity: 0.07))
+        .background(Color.brand.opacity(0.06))
     }
 
     // MARK: Loading
@@ -159,7 +142,7 @@ struct ContentView: View {
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView().scaleEffect(1.2)
-                .tint(.brandMid)
+                .tint(.brand)
             Text("Scanning apps…").foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -220,7 +203,7 @@ struct ContentView: View {
         .padding(.vertical, 6)
         .background(.bar)
         .overlay(alignment: .top) {
-            BrandGradient(opacity: 0.25).frame(height: 1)
+            Color.brand.opacity(0.3).frame(height: 1)
         }
     }
 
@@ -253,7 +236,7 @@ struct GetInfoSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header with brand gradient bar
             ZStack(alignment: .bottom) {
-                BrandGradient(opacity: 0.12)
+                Color.brand.opacity(0.08)
                 HStack(spacing: 12) {
                     AppIconView(url: app.url)
                         .frame(width: 48, height: 48)
@@ -398,8 +381,8 @@ struct ArchBadge: View {
 
     private var archColor: Color {
         switch arch {
-        case .appleSilicon: return .brandMid
-        case .universal:    return Color(red: 0.20, green: 0.50, blue: 0.90)
+        case .appleSilicon: return .brand
+        case .universal:    return .green
         case .intel:        return .orange
         case .unknown:      return .gray
         }
@@ -420,9 +403,9 @@ struct FilterChip: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(isSelected
-                    ? Color.brandMid.opacity(0.18)
+                    ? Color.brand.opacity(0.15)
                     : Color.secondary.opacity(0.10))
-                .foregroundStyle(isSelected ? Color.brandMid : Color.primary)
+                .foregroundStyle(isSelected ? Color.brand : Color.primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
