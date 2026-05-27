@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "SiliconScout",
-    platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v13)],
     products: [
         .library(name: "SiliconScoutCore", targets: ["SiliconScoutCore"]),
     ],
@@ -16,6 +16,11 @@ let package = Package(
             name: "siliconscout",
             dependencies: ["SiliconScoutCore"],
             path: "Sources/siliconscout"
+        ),
+        .executableTarget(
+            name: "SiliconScoutApp",
+            dependencies: ["SiliconScoutCore"],
+            path: "Sources/SiliconScoutApp"
         ),
         .testTarget(
             name: "SiliconScoutCoreTests",
