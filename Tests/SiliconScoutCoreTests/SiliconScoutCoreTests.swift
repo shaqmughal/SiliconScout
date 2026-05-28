@@ -207,7 +207,201 @@ final class SiliconScoutCoreTests: XCTestCase {
                                            lipoPath: "/nonexistent/lipo"), .unknown)
     }
 
-    // MARK: - resolveLauncherTarget
+    // MARK: - expandShellVars
+
+    func testExpandShellVars_braceForm() {
+        XCTAssertEqual(expandShellVars("${FOO}/baz", vars: ["FOO": "bar"]), "bar/baz")
+    }
+
+    func testExpandShellVars_dollarForm() {
+        XCTAssertEqual(expandShellVars("$FOO/baz", vars: ["FOO": "bar"]), "bar/baz")
+    }
+
+    func testExpandShellVars_longerKeyTakesPrecedence() {
+        // $STREAMERSDIR must not be partially consumed by the shorter $STREAMER key.
+        let vars = ["STREAMER": "WRONG", "STREAMERSDIR": "/correct/path"]
+        XCTAssertEqual(expandShellVars("$STREAMERSDIR", vars: vars), "/correct/path")
+    }
+
+    func testExpandShellVars_unknownVarLeftUnchanged() {
+        XCTAssertEqual(expandShellVars("${UNKNOWN}/path", vars: ["FOO": "bar"]), "${UNKNOWN}/path")
+    }
+
+    func testExpandShellVars_chainedExpansion() {
+        // Already-expanded vars are used when expanding subsequent vars in the dict.
+        let vars = ["BASE": "/usr", "DIR": "/usr/local"]
+        XCTAssertEqual(expandShellVars("$DIR/bin", vars: vars), "/usr/local/bin")
+    }
+
+    // MARK: - buildVarDict
+
+    func testBuildVarDict_doubleQuotedAssignment() {
+        let dict = buildVarDict(from: [#"realApp="Autodesk Fusion 360""#])
+        XCTAssertEqual(dict["realApp"], "Autodesk Fusion 360")
+    }
+
+    func testBuildVarDict_singleQuotedAssignment() {
+        let dict = buildVarDict(from: ["NAME='My App'"])
+        XCTAssertEqual(dict["NAME"], "My App")
+    }
+
+    func testBuildVarDict_chainedAssignment() {
+        let dict = buildVarDict(from: [#"BASE="/usr/local""#, #"BINDIR="$BASE/bin""#])
+        XCTAssertEqual(dict["BINDIR"], "/usr/local/bin")
+    }
+
+    func testBuildVarDict_skipCommandSubstitution() {
+        let dict = buildVarDict(from: ["VER=$(git describe)"])
+        XCTAssertNil(dict["VER"])
+    }
+
+    func testBuildVarDict_doesNotOverwriteWithEmpty() {
+        let dict = buildVarDict(from: [#"MYVAR="/useful/path""#, #"MYVAR="""#])
+        XCTAssertEqual(dict["MYVAR"], "/useful/path")
+    }
+
+    func testBuildVarDict_homeExpansion() {
+        let dict = buildVarDict(from: [#"DIR="$HOME/Library""#], homeDir: "/Users/testuser")
+        XCTAssertEqual(dict["DIR"], "/Users/testuser/Library")
+    }
+
+    // MARK: - resolveLauncherTarget (variable substitution and new patterns)
+
+    func testResolveLauncherTarget_execWithVarSubstitution() throws {
+        // Script uses a shell variable to build the executable path, then execs it.
+        let binDir = tempDir.appendingPathComponent("VarBin")
+        try FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
+        let targetURL = binDir.appendingPathComponent("real_binary")
+        try FileManager.default.copyItem(at: arm64BinaryURL, to: targetURL)
+
+        let script = "#!/bin/sh\nBINDIR=\"\(binDir.path)\"\nexec \"$BINDIR/real_binary\" \"$@\"\n"
+        let scriptURL = tempDir.appendingPathComponent("var_exec_launcher")
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(resolveLauncherTarget(of: scriptURL)?.standardizedFileURL,
+                       targetURL.standardizedFileURL)
+    }
+
+    func testResolveLauncherTarget_openAppPattern() throws {
+        // Script launches a .app bundle with `open` — resolve its executable.
+        let realApp = try makeApp(name: "OpenTarget") { exe in
+            try FileManager.default.copyItem(at: self.arm64BinaryURL, to: exe)
+        }
+        let script = "#!/bin/sh\nopen \"\(realApp.path)\" --args \"$@\"\n"
+        let scriptURL = tempDir.appendingPathComponent("open_launcher")
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+
+        let target = resolveLauncherTarget(of: scriptURL)
+        XCTAssertNotNil(target)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: target!.path))
+    }
+
+    func testResolveLauncherTarget_openWithVarSubstitution() throws {
+        // Variables construct the .app path and open launches it.
+        let realApp = try makeApp(name: "VarOpenTarget") { exe in
+            try FileManager.default.copyItem(at: self.universalBinaryURL, to: exe)
+        }
+        let appDir  = realApp.deletingLastPathComponent().path
+        let appName = realApp.deletingPathExtension().lastPathComponent
+        let script = """
+        #!/bin/sh
+        APPDIR="\(appDir)"
+        APPNAME="\(appName)"
+        APPPATH="$APPDIR/$APPNAME.app"
+        open "$APPPATH" --args "$@"
+        """
+        let scriptURL = tempDir.appendingPathComponent("var_open_launcher")
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+
+        let target = resolveLauncherTarget(of: scriptURL)
+        XCTAssertNotNil(target)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: target!.path))
+    }
+
+    func testResolveLauncherTarget_execWithVarAndQuotedFlag() throws {
+        // `exec "$PATH/binary" "-serviceUtil" "$@"` — quoted flag must be stripped.
+        let binDir = tempDir.appendingPathComponent("FlagBin")
+        try FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
+        let targetURL = binDir.appendingPathComponent("binary")
+        try FileManager.default.copyItem(at: arm64BinaryURL, to: targetURL)
+
+        let script = "#!/bin/sh\nBINDIR=\"\(binDir.path)\"\nexec \"$BINDIR/binary\" \"-serviceUtil\" \"$@\"\n"
+        let scriptURL = tempDir.appendingPathComponent("flag_exec_launcher")
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(resolveLauncherTarget(of: scriptURL)?.standardizedFileURL,
+                       targetURL.standardizedFileURL)
+    }
+
+    func testResolveLauncherTarget_directInvocationWithVar() throws {
+        // Script sets a variable and invokes it directly (no `exec` keyword).
+        let binDir = tempDir.appendingPathComponent("DirectBin")
+        try FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
+        let targetURL = binDir.appendingPathComponent("direct_binary")
+        try FileManager.default.copyItem(at: arm64BinaryURL, to: targetURL)
+
+        let script = "#!/bin/sh\nBINPATH=\"\(targetURL.path)\"\n\"$BINPATH\" -flag1 -flag2\n"
+        let scriptURL = tempDir.appendingPathComponent("direct_launcher")
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(resolveLauncherTarget(of: scriptURL)?.standardizedFileURL,
+                       targetURL.standardizedFileURL)
+    }
+
+    func testResolveLauncherTarget_wildcardPathComponent() throws {
+        // Variable has an unresolvable component (e.g. a loop variable ${ver}).
+        // The resolver should enumerate the parent directory to find the binary.
+        let versionsDir = tempDir.appendingPathComponent("Versions")
+        let v1Dir = versionsDir.appendingPathComponent("v1")
+        try FileManager.default.createDirectory(at: v1Dir, withIntermediateDirectories: true)
+        let binaryURL = v1Dir.appendingPathComponent("binary")
+        try FileManager.default.copyItem(at: arm64BinaryURL, to: binaryURL)
+
+        let script = """
+        #!/bin/sh
+        VERSIONSDIR="\(versionsDir.path)"
+        for ver in $(ls "$VERSIONSDIR"); do
+            BINPATH="${VERSIONSDIR}/${ver}/binary"
+        done
+        "$BINPATH" -args
+        """
+        let scriptURL = tempDir.appendingPathComponent("wildcard_launcher")
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(resolveLauncherTarget(of: scriptURL)?.standardizedFileURL,
+                       binaryURL.standardizedFileURL)
+    }
+
+    func testScanApps_autodeskStyleOpenLauncherResolvesArchitecture() throws {
+        // Models the Autodesk Fusion pattern: wrapper .app whose launcher script
+        // uses `open` with shell variables to launch the real .app stored elsewhere.
+        let scanDir = tempDir.appendingPathComponent("AutodeskStyle")
+        try FileManager.default.createDirectory(at: scanDir, withIntermediateDirectories: true)
+
+        let realApp = try makeApp(name: "RealFusion") { exe in
+            try FileManager.default.copyItem(at: self.universalBinaryURL, to: exe)
+        }
+        let wrapperApp = try makeApp(name: "AutodeskFusion") { scriptURL in
+            let script = """
+            #!/bin/sh
+            destfolder="\(realApp.deletingLastPathComponent().path)"
+            realApp="RealFusion"
+            STREAMERPATH="$destfolder/$realApp.app"
+            open "$STREAMERPATH" --args "$@"
+            """
+            try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755],
+                                                   ofItemAtPath: scriptURL.path)
+        }
+        try FileManager.default.moveItem(at: wrapperApp,
+                                         to: scanDir.appendingPathComponent("AutodeskFusion.app"))
+
+        let results = scanApps(in: [scanDir])
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].arch, .universal)
+    }
+
+    // MARK: - resolveLauncherTarget (existing patterns)
 
     func testResolveLauncherTarget_nonScriptFile() {
         // A Mach-O binary has no shebang — should return nil immediately.
@@ -394,6 +588,150 @@ final class SiliconScoutCoreTests: XCTestCase {
         XCTAssertTrue(results.allSatisfy { $0.url.pathExtension == "app" })
         XCTAssertEqual(results.map { $0.url.deletingPathExtension().lastPathComponent },
                        ["Alpha", "Mango", "Zebra"])
+    }
+
+    // MARK: - scanApps alias resolution
+
+    /// Creates a macOS Finder alias at `aliasURL` pointing to `targetURL`.
+    func makeAlias(at aliasURL: URL, targeting targetURL: URL) throws {
+        let bookmarkData = try targetURL.bookmarkData(
+            options: [.suitableForBookmarkFile],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+        try URL.writeBookmarkData(bookmarkData, to: aliasURL)
+    }
+
+    func testScanApps_aliasToArm64AppReportsAppleSilicon() throws {
+        let scanDir = tempDir.appendingPathComponent("AliasArm64")
+        try FileManager.default.createDirectory(at: scanDir, withIntermediateDirectories: true)
+        let target = try makeApp(name: "RealArm64") { exe in
+            try FileManager.default.copyItem(at: self.arm64BinaryURL, to: exe)
+        }
+        try makeAlias(at: scanDir.appendingPathComponent("RealArm64.app"), targeting: target)
+        let results = scanApps(in: [scanDir])
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].arch, .appleSilicon)
+    }
+
+    func testScanApps_aliasToIntelAppReportsIntel() throws {
+        let scanDir = tempDir.appendingPathComponent("AliasIntel")
+        try FileManager.default.createDirectory(at: scanDir, withIntermediateDirectories: true)
+        let target = try makeApp(name: "RealIntel") { exe in
+            try FileManager.default.copyItem(at: self.x86BinaryURL, to: exe)
+        }
+        try makeAlias(at: scanDir.appendingPathComponent("RealIntel.app"), targeting: target)
+        let results = scanApps(in: [scanDir])
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].arch, .intel)
+    }
+
+    func testScanApps_aliasToUniversalAppReportsUniversal() throws {
+        let scanDir = tempDir.appendingPathComponent("AliasUniversal")
+        try FileManager.default.createDirectory(at: scanDir, withIntermediateDirectories: true)
+        let target = try makeApp(name: "RealUniversal") { exe in
+            try FileManager.default.copyItem(at: self.universalBinaryURL, to: exe)
+        }
+        try makeAlias(at: scanDir.appendingPathComponent("RealUniversal.app"), targeting: target)
+        let results = scanApps(in: [scanDir])
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].arch, .universal)
+    }
+
+    func testScanApps_aliasPreservesAliasName() throws {
+        // The display name must come from the alias filename, not the target bundle.
+        let scanDir = tempDir.appendingPathComponent("AliasName")
+        try FileManager.default.createDirectory(at: scanDir, withIntermediateDirectories: true)
+        let target = try makeApp(name: "OriginalName") { exe in
+            try FileManager.default.copyItem(at: self.arm64BinaryURL, to: exe)
+        }
+        try makeAlias(at: scanDir.appendingPathComponent("AliasName.app"), targeting: target)
+        let results = scanApps(in: [scanDir])
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].name, "AliasName")
+    }
+
+    func testScanApps_aliasURLPointsToTarget() throws {
+        // AppInfo.url should be the resolved target path, not the alias file path.
+        let scanDir = tempDir.appendingPathComponent("AliasURL")
+        try FileManager.default.createDirectory(at: scanDir, withIntermediateDirectories: true)
+        let target = try makeApp(name: "URLTarget") { exe in
+            try FileManager.default.copyItem(at: self.arm64BinaryURL, to: exe)
+        }
+        try makeAlias(at: scanDir.appendingPathComponent("URLTarget.app"), targeting: target)
+        let results = scanApps(in: [scanDir])
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].url.standardizedFileURL, target.standardizedFileURL)
+    }
+
+    func testScanApps_aliasPropagatesVersionAndBundleID() throws {
+        // Metadata (version, bundleID) must come from the target bundle, not the alias.
+        let scanDir = tempDir.appendingPathComponent("AliasMeta")
+        try FileManager.default.createDirectory(at: scanDir, withIntermediateDirectories: true)
+        let appURL   = tempDir.appendingPathComponent("MetaTarget.app")
+        let macosDir = appURL.appendingPathComponent("Contents/MacOS")
+        try FileManager.default.createDirectory(at: macosDir, withIntermediateDirectories: true)
+        let plist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>CFBundleExecutable</key><string>MetaTarget</string>
+          <key>CFBundleShortVersionString</key><string>9.8.7</string>
+          <key>CFBundleIdentifier</key><string>com.test.metatarget</string>
+        </dict>
+        </plist>
+        """
+        try plist.write(to: appURL.appendingPathComponent("Contents/Info.plist"),
+                        atomically: true, encoding: .utf8)
+        try FileManager.default.copyItem(at: arm64BinaryURL,
+                                         to: macosDir.appendingPathComponent("MetaTarget"))
+        try makeAlias(at: scanDir.appendingPathComponent("MetaTarget.app"), targeting: appURL)
+        let results = scanApps(in: [scanDir])
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].version,  "9.8.7")
+        XCTAssertEqual(results[0].bundleID, "com.test.metatarget")
+    }
+
+    func testScanApps_danglingAliasReturnsUnknown() throws {
+        // Alias whose target no longer exists falls back to the alias file → .unknown.
+        let scanDir = tempDir.appendingPathComponent("AliasDangling")
+        try FileManager.default.createDirectory(at: scanDir, withIntermediateDirectories: true)
+        let target = try makeApp(name: "ToBeDeleted") { exe in
+            try FileManager.default.copyItem(at: self.arm64BinaryURL, to: exe)
+        }
+        try makeAlias(at: scanDir.appendingPathComponent("ToBeDeleted.app"), targeting: target)
+        try FileManager.default.removeItem(at: target)
+        let results = scanApps(in: [scanDir])
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0].arch, .unknown)
+    }
+
+    func testScanApps_mixOfAliasesAndRealAppsAllCorrect() throws {
+        // A directory containing both a real .app and an alias to another .app should
+        // report the correct architecture for each entry.
+        let scanDir = tempDir.appendingPathComponent("MixedAliases")
+        try FileManager.default.createDirectory(at: scanDir, withIntermediateDirectories: true)
+
+        // Real arm64 app placed directly in the scan dir.
+        let directApp = try makeApp(name: "DirectArm64") { exe in
+            try FileManager.default.copyItem(at: self.arm64BinaryURL, to: exe)
+        }
+        try FileManager.default.moveItem(at: directApp,
+                                         to: scanDir.appendingPathComponent("DirectArm64.app"))
+
+        // Alias in scan dir pointing to a universal app stored elsewhere.
+        let externalApp = try makeApp(name: "ExternalUniversal") { exe in
+            try FileManager.default.copyItem(at: self.universalBinaryURL, to: exe)
+        }
+        try makeAlias(at: scanDir.appendingPathComponent("ExternalUniversal.app"),
+                      targeting: externalApp)
+
+        let results = scanApps(in: [scanDir])
+        XCTAssertEqual(results.count, 2)
+        let byName = Dictionary(uniqueKeysWithValues: results.map { ($0.name, $0.arch) })
+        XCTAssertEqual(byName["DirectArm64"],     .appleSilicon)
+        XCTAssertEqual(byName["ExternalUniversal"], .universal)
     }
 
     func testScanApps_populatesVersionAndBundleID() throws {
