@@ -128,34 +128,147 @@ public func architectureViaLipo(executable: URL, lipoPath: String = "/usr/bin/li
     return classify(hasARM: output.contains("arm64"), hasIntel: output.contains("x86_64"))
 }
 
+/// Expand `$VAR` and `${VAR}` references in `text` using the provided dictionary.
+/// Keys are processed longest-first to prevent a shorter key from partially consuming a longer one.
+func expandShellVars(_ text: String, vars: [String: String]) -> String {
+    var result = text
+    let keys = vars.keys.sorted { $0.count > $1.count }
+    for key in keys { result = result.replacingOccurrences(of: "${\(key)}", with: vars[key]!) }
+    for key in keys { result = result.replacingOccurrences(of: "$\(key)",   with: vars[key]!) }
+    return result
+}
+
+/// Build a variable dictionary from simple scalar shell assignments (`VAR="value"`).
+/// Skips lines with command substitutions. Does not overwrite a non-empty value
+/// with an empty one (handles `VAR=""` inside loops that run after a real assignment).
+func buildVarDict(from lines: [String], homeDir: String = NSHomeDirectory()) -> [String: String] {
+    var vars: [String: String] = ["HOME": homeDir]
+    for rawLine in lines {
+        let line = rawLine.trimmingCharacters(in: .whitespaces)
+        guard !line.hasPrefix("#"), let eqIdx = line.firstIndex(of: "=") else { continue }
+        let name = String(line[..<eqIdx])
+        guard !name.isEmpty, !name.contains(" "),
+              name.first.map({ $0.isLetter || $0 == "_" }) == true,
+              name.unicodeScalars.dropFirst().allSatisfy({
+                  CharacterSet.alphanumerics.union(.init(charactersIn: "_")).contains($0)
+              }) else { continue }
+        var raw = String(line[line.index(after: eqIdx)...])
+        guard !raw.contains("`"), !raw.contains("$(") else { continue }
+        if raw.count >= 2,
+           (raw.hasPrefix("\"") && raw.hasSuffix("\"")) ||
+           (raw.hasPrefix("'")  && raw.hasSuffix("'")) {
+            raw = String(raw.dropFirst().dropLast())
+        }
+        let expanded = expandShellVars(raw, vars: vars)
+        if !expanded.isEmpty || vars[name] == nil { vars[name] = expanded }
+    }
+    return vars
+}
+
+/// Resolve a path containing one `${...}` wildcard component by enumerating
+/// the parent directory and returning the first entry whose suffixed path exists.
+private func resolveWildcardPath(_ pattern: String, fm: FileManager) -> URL? {
+    guard let varStart = pattern.range(of: "${"),
+          let varEnd   = pattern[varStart.upperBound...].firstIndex(of: "}") else { return nil }
+    let prefix    = String(pattern[..<varStart.lowerBound])
+    let suffix    = String(pattern[pattern.index(after: varEnd)...])
+    let parentURL = URL(fileURLWithPath: prefix).standardizedFileURL
+    guard let entries = try? fm.contentsOfDirectory(at: parentURL, includingPropertiesForKeys: nil)
+    else { return nil }
+    for entry in entries.sorted(by: { $0.lastPathComponent > $1.lastPathComponent }) {
+        let candidate = URL(fileURLWithPath: entry.path + suffix).standardizedFileURL
+        if fm.fileExists(atPath: candidate.path) { return candidate }
+    }
+    return nil
+}
+
 /// If a bundle's main executable is a shell-script launcher, follow the binary
-/// it `exec`s and return that URL. Returns `nil` for non-script files or when
-/// the exec target can't be found on disk.
+/// it launches and return that URL. Returns `nil` for non-script files or when
+/// the target can't be found on disk.
+///
+/// Handles three launch patterns:
+///   1. `exec "path"` — including shell-variable–built paths and dirname idioms
+///   2. `open "App.app"` — resolves the bundle's own executable
+///   3. `"$VAR" args` — direct invocation without exec keyword
 public func resolveLauncherTarget(of script: URL) -> URL? {
     guard let text = try? String(contentsOf: script, encoding: .utf8),
           text.hasPrefix("#!") else { return nil }
 
     let scriptDir = script.deletingLastPathComponent().path
+    let fm        = FileManager.default
+    let lines     = text.components(separatedBy: .newlines)
+    let vars      = buildVarDict(from: lines)
 
-    for rawLine in text.split(whereSeparator: \.isNewline) {
+    for rawLine in lines {
         let line = rawLine.trimmingCharacters(in: .whitespaces)
-        guard line.hasPrefix("exec ") else { continue }
 
-        var command = String(line.dropFirst("exec ".count))
-        if let argRange = command.range(of: " \"$@\"") {
-            command = String(command[..<argRange.lowerBound])
+        // --- Pattern: open "App.app" [args] ---
+        if line.hasPrefix("open ") {
+            let payload = expandShellVars(String(line.dropFirst("open ".count)), vars: vars)
+            if let appPath = extractFirstQuotedOrUnquotedArg(from: payload),
+               appPath.hasSuffix(".app"),
+               let bundle = Bundle(url: URL(fileURLWithPath: appPath)),
+               let exe = bundle.executableURL,
+               fm.fileExists(atPath: exe.path) {
+                return exe.standardizedFileURL
+            }
+            continue
         }
 
-        for idiom in ["$(dirname \"$0\")", "$(dirname $0)", "${0%/*}"] {
-            command = command.replacingOccurrences(of: idiom, with: scriptDir)
+        // --- Pattern: exec "path" [args] ---
+        if line.hasPrefix("exec ") {
+            var command = expandShellVars(String(line.dropFirst("exec ".count)), vars: vars)
+            // Strip argument-forwarding suffixes
+            for suffix in [" \"$@\"", " $*", " $@"] {
+                if let r = command.range(of: suffix) { command = String(command[..<r.lowerBound]) }
+            }
+            // Variable-expanded path: extract the first quoted token (handles spaces in paths)
+            if command.hasPrefix("\""), !command.contains("$(") {
+                if let close = command.dropFirst().firstIndex(of: "\"") {
+                    let path = String(command[command.index(after: command.startIndex)..<close])
+                    if !path.isEmpty { return resolveOrWildcard(path, fm: fm) }
+                }
+                continue
+            }
+            // Legacy: apply dirname/trim idioms, then strip all quotes
+            for idiom in ["$(dirname \"$0\")", "$(dirname $0)", "${0%/*}"] {
+                command = command.replacingOccurrences(of: idiom, with: scriptDir)
+            }
+            command = command.replacingOccurrences(of: "\"", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            if let url = resolveOrWildcard(command, fm: fm) { return url }
+            continue
         }
-        command = command.replacingOccurrences(of: "\"", with: "")
-            .trimmingCharacters(in: .whitespaces)
 
-        let target = URL(fileURLWithPath: command).standardizedFileURL
-        if FileManager.default.fileExists(atPath: target.path) { return target }
+        // --- Pattern: "$VAR" args  (direct invocation, no exec keyword) ---
+        if line.hasPrefix("\"$") {
+            var command = expandShellVars(line, vars: vars)
+            if command.hasPrefix("\""),
+               let close = command.dropFirst().firstIndex(of: "\"") {
+                let path = String(command[command.index(after: command.startIndex)..<close])
+                if !path.isEmpty, let url = resolveOrWildcard(path, fm: fm) { return url }
+            }
+        }
     }
     return nil
+}
+
+/// Resolve `path` to an existing URL, falling back to wildcard enumeration if
+/// the path contains an unresolved `${...}` component.
+private func resolveOrWildcard(_ path: String, fm: FileManager) -> URL? {
+    if path.contains("${") { return resolveWildcardPath(path, fm: fm) }
+    let url = URL(fileURLWithPath: path).standardizedFileURL
+    return fm.fileExists(atPath: url.path) ? url : nil
+}
+
+/// Extract the first argument from a shell command string, respecting double-quotes.
+private func extractFirstQuotedOrUnquotedArg(from command: String) -> String? {
+    let s = command.trimmingCharacters(in: .whitespaces)
+    if s.hasPrefix("\""), let close = s.dropFirst().firstIndex(of: "\"") {
+        return String(s[s.index(after: s.startIndex)..<close])
+    }
+    let token = s.components(separatedBy: " ").first ?? ""
+    return token.isEmpty ? nil : token
 }
 
 /// Enumerate `.app` bundles in the given directories and return them sorted by name.
@@ -167,14 +280,15 @@ public func scanApps(in directories: [URL]) -> [AppInfo] {
             at: dir, includingPropertiesForKeys: nil
         ) else { continue }
         for entry in entries where entry.pathExtension == "app" {
+            let resolved = (try? URL(resolvingAliasFileAt: entry, options: [])) ?? entry
             let name = entry.deletingPathExtension().lastPathComponent
-            let bundle = Bundle(url: entry)
+            let bundle = Bundle(url: resolved)
             let version  = bundle?.infoDictionary?["CFBundleShortVersionString"] as? String
             let bundleID = bundle?.bundleIdentifier
             apps.append(AppInfo(
                 name: name,
-                arch: architecture(of: entry),
-                url: entry,
+                arch: architecture(of: resolved),
+                url: resolved,
                 version: version,
                 bundleID: bundleID
             ))

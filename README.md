@@ -8,6 +8,10 @@ A macOS utility that scans your installed applications and reports whether each 
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-native-green) ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange) ![License: MIT](https://img.shields.io/badge/License-MIT-green) [![CI](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml/badge.svg)](https://github.com/shaqmughal/SiliconScout/actions/workflows/ci.yml) [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/shaqmughal)
 
+<p align="center">
+  <img src="docs/SiliconScout_Screenshot.png" alt="SiliconScout screenshot" width="800" />
+</p>
+
 ## Why this matters
 
 Apple has confirmed that **Rosetta 2 will be removed starting with macOS 28** — only a small set of older, unmaintained games will retain any Rosetta functionality after that point. Apple recommends that users *"update your Intel-based apps, plug-ins, extensions, and other add-ons for Apple silicon"* for *"optimal performance and future compatibility."*
