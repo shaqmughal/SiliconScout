@@ -1,5 +1,9 @@
 import Foundation
 
+public enum SupportLinks {
+    public static let buyMeACoffee = URL(string: "https://buymeacoffee.com/shaqmughal")!
+}
+
 /// How a macOS app's binary can run on the current Mac.
 public enum AppArchitecture: String, Equatable {
     case appleSilicon = "Apple Silicon"   // arm64 only
