@@ -87,6 +87,15 @@ final class SiliconScoutCoreTests: XCTestCase {
         }
     }
 
+    // MARK: - SupportLinks
+
+    func testSupportLinks_buyMeACoffee_isValidURL() {
+        let url = SupportLinks.buyMeACoffee
+        XCTAssertEqual(url.scheme, "https")
+        XCTAssertEqual(url.host, "buymeacoffee.com")
+        XCTAssertEqual(url.absoluteString, "https://buymeacoffee.com/shaqmughal")
+    }
+
     // MARK: - AppInfo
 
     func testAppInfo_storesAllFields() {

@@ -1,3 +1,4 @@
+import SiliconScoutCore
 import SwiftUI
 
 @main
@@ -7,5 +8,10 @@ struct SiliconScoutApp: App {
             ContentView()
         }
         .defaultSize(width: 640, height: 520)
+        .commands {
+            CommandGroup(after: .help) {
+                Link("Buy Me a Coffee ☕", destination: SupportLinks.buyMeACoffee)
+            }
+        }
     }
 }
